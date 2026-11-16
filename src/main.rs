@@ -4,21 +4,18 @@ const ROWS: usize = 5;
 const COLS: usize = 9;
 const CELL_SIZE: f32 = 80.0;
 const GRID_OFFSET_X: f32 = 60.0;
-const GRID_OFFSET_Y: f32 = 100.0;
+const GRID_OFFSET_Y: f32 = 105.0;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum PlantType {
-    // Plantas Base
-    Peashooter,    // Tecla 1: Atira ervilhas
-    Sunflower,     // Tecla 2: Gera sóis
-    WallNut,       // Tecla 3: Tanque com muita vida
-    CherryBomb,    // Tecla 4: Catalisador explosivo
-
-    // Plantas Fundidas (PvZ Fusion)
-    SunPeashooter, // Ervilha + Girassol: Atira rápido e gera sol a cada 7s
-    PeaNut,        // Ervilha + Noz: Blindagem pesada + tiros duplos
-    ExplodeNut,    // Noz + Cereja: Explode ao ser destruída pelos zumbis!
-    GatlingCherry, // Ervilha + Cereja: Dispara rajadas explosivas de 3 ervilhas
+    Peashooter,
+    Sunflower,
+    WallNut,
+    CherryBomb,
+    SunPeashooter,
+    PeaNut,
+    ExplodeNut,
+    GatlingCherry,
 }
 
 impl PlantType {
@@ -69,7 +66,6 @@ impl PlantType {
     }
 }
 
-// Tabela de receitas de fusão (funciona em qualquer ordem!)
 fn try_fuse(existing: PlantType, incoming: PlantType) -> Option<PlantType> {
     match (existing, incoming) {
         (PlantType::Peashooter, PlantType::Sunflower)
@@ -117,7 +113,6 @@ struct ExplosionEffect {
     y: f32,
     timer: f32,
 }
-
 #[macroquad::main("PvZ Fusion - Rust Edition")]
 async fn main() {
     let mut grid: [[Option<Plant>; COLS]; ROWS] = [[None; COLS]; ROWS];
@@ -131,18 +126,25 @@ async fn main() {
     let mut zombie_spawn_timer: f32 = 2.0;
     let mut score: i32 = 0;
     let mut wave: i32 = 1;
-    let mut status_msg = String::from("Clique no gramado para plantar. Clique sobre outra planta para FUNDIR!");
+    let mut status_msg = String::from("Toque na carta acima e depois no gramado!");
     let mut game_over = false;
 
+    let seed_cards = [
+        PlantType::Peashooter,
+        PlantType::Sunflower,
+        PlantType::WallNut,
+        PlantType::CherryBomb,
+    ];
+
     loop {
-        let dt = get_frame_time().min(0.1); // Trava delta-time para evitar saltos ao arrastar janela
+        let dt = get_frame_time().min(0.1);
         clear_background(Color::from_rgba(30, 120, 30, 255));
 
         if game_over {
             draw_rectangle(0.0, 0.0, screen_width(), screen_height(), Color::from_rgba(0, 0, 0, 180));
-            draw_text("GAME OVER! Os zumbis invadiram a casa!", 140.0, 250.0, 34.0, RED);
-            draw_text(&format!("Pontuacao Final: {} | Onda: {}", score, wave), 240.0, 300.0, 26.0, YELLOW);
-            draw_text("Pressione R ou clique na tela para jogar novamente", 180.0, 350.0, 22.0, WHITE);
+            draw_text("GAME OVER! Os zumbis venceram!", 140.0, 250.0, 34.0, RED);
+            draw_text(&format!("Pontuacao: {} | Onda: {}", score, wave), 240.0, 300.0, 26.0, YELLOW);
+            draw_text("Toque na tela ou aperte R para reiniciar", 190.0, 350.0, 22.0, WHITE);
 
             if is_key_pressed(KeyCode::R) || is_mouse_button_pressed(MouseButton::Left) {
                 grid = [[None; COLS]; ROWS];
@@ -153,38 +155,26 @@ async fn main() {
                 score = 0;
                 wave = 1;
                 zombie_spawn_timer = 2.0;
-                status_msg = String::from("Partida reiniciada! Boa sorte!");
+                status_msg = String::from("Partida reiniciada!");
                 game_over = false;
             }
             next_frame().await;
             continue;
         }
 
-        // Seleção de sementes pelo teclado (1, 2, 3, 4)
-        if is_key_pressed(KeyCode::Key1) {
-            selected_seed = PlantType::Peashooter;
-        }
-        if is_key_pressed(KeyCode::Key2) {
-            selected_seed = PlantType::Sunflower;
-        }
-        if is_key_pressed(KeyCode::Key3) {
-            selected_seed = PlantType::WallNut;
-        }
-        if is_key_pressed(KeyCode::Key4) {
-            selected_seed = PlantType::CherryBomb;
-        }
+        if is_key_pressed(KeyCode::Key1) { selected_seed = PlantType::Peashooter; }
+        if is_key_pressed(KeyCode::Key2) { selected_seed = PlantType::Sunflower; }
+        if is_key_pressed(KeyCode::Key3) { selected_seed = PlantType::WallNut; }
+        if is_key_pressed(KeyCode::Key4) { selected_seed = PlantType::CherryBomb; }
 
-        // Sol caindo do céu a cada 5 segundos
         sky_sun_timer += dt;
         if sky_sun_timer >= 5.0 {
             sun += 25;
             sky_sun_timer = 0.0;
         }
 
-        // Aumenta dificuldade por pontuação
         wave = 1 + (score / 100);
 
-        // Spawn de Zumbis
         zombie_spawn_timer -= dt;
         if zombie_spawn_timer <= 0.0 {
             let random_row = rand::gen_range(0, ROWS);
@@ -204,9 +194,18 @@ async fn main() {
             zombie_spawn_timer = rand::gen_range(min_spawn, min_spawn + 2.0);
         }
 
-        // Clique no tabuleiro para plantar ou FUNDIR
         if is_mouse_button_pressed(MouseButton::Left) {
             let (mx, my) = mouse_position();
+
+            for (i, &seed) in seed_cards.iter().enumerate() {
+                let card_x = 210.0 + (i as f32 * 145.0);
+                let card_y = 8.0;
+                if mx >= card_x && mx <= card_x + 135.0 && my >= card_y && my <= card_y + 42.0 {
+                    selected_seed = seed;
+                    status_msg = format!("Selecionado: {} ({} sois)", seed.label(), seed.cost());
+                }
+            }
+
             if mx >= GRID_OFFSET_X && my >= GRID_OFFSET_Y {
                 let col = ((mx - GRID_OFFSET_X) / CELL_SIZE) as usize;
                 let row = ((my - GRID_OFFSET_Y) / CELL_SIZE) as usize;
@@ -238,13 +237,13 @@ async fn main() {
                                         attack_timer: 0.0,
                                         sun_timer: 0.0,
                                     });
-                                    status_msg = format!("FUSAO REALIZADA: {}!", fused_kind.label());
+                                    status_msg = format!("FUSAO: {}!", fused_kind.label());
                                 } else {
                                     status_msg = String::from("Sois insuficientes para fundir!");
                                 }
                             } else {
                                 status_msg = format!(
-                                    "Sem receita entre {} + {}",
+                                    "Sem fusao: {} + {}",
                                     existing_plant.kind.label(),
                                     selected_seed.label()
                                 );
@@ -254,8 +253,6 @@ async fn main() {
                 }
             }
         }
-
-        // Atualização das Plantas
         for r in 0..ROWS {
             for c in 0..COLS {
                 if let Some(ref mut plant) = grid[r][c] {
@@ -267,12 +264,7 @@ async fn main() {
                     match plant.kind {
                         PlantType::Peashooter => {
                             if zombie_in_lane && plant.attack_timer >= 1.5 {
-                                projectiles.push(Projectile {
-                                    row: r,
-                                    x: plant_x + 20.0,
-                                    damage: 25.0,
-                                    explosive: false,
-                                });
+                                projectiles.push(Projectile { row: r, x: plant_x + 20.0, damage: 25.0, explosive: false });
                                 plant.attack_timer = 0.0;
                             }
                         }
@@ -283,14 +275,8 @@ async fn main() {
                             }
                         }
                         PlantType::SunPeashooter => {
-                            // Atira mais rápido E gera sol com timer fixo (sem bug de FPS)
                             if zombie_in_lane && plant.attack_timer >= 1.1 {
-                                projectiles.push(Projectile {
-                                    row: r,
-                                    x: plant_x + 20.0,
-                                    damage: 30.0,
-                                    explosive: false,
-                                });
+                                projectiles.push(Projectile { row: r, x: plant_x + 20.0, damage: 30.0, explosive: false });
                                 plant.attack_timer = 0.0;
                             }
                             if plant.sun_timer >= 7.0 {
@@ -299,32 +285,15 @@ async fn main() {
                             }
                         }
                         PlantType::PeaNut => {
-                            // Dispara rajada dupla de ervilhas
                             if zombie_in_lane && plant.attack_timer >= 1.4 {
-                                projectiles.push(Projectile {
-                                    row: r,
-                                    x: plant_x + 15.0,
-                                    damage: 25.0,
-                                    explosive: false,
-                                });
-                                projectiles.push(Projectile {
-                                    row: r,
-                                    x: plant_x + 35.0,
-                                    damage: 25.0,
-                                    explosive: false,
-                                });
+                                projectiles.push(Projectile { row: r, x: plant_x + 15.0, damage: 25.0, explosive: false });
+                                projectiles.push(Projectile { row: r, x: plant_x + 35.0, damage: 25.0, explosive: false });
                                 plant.attack_timer = 0.0;
                             }
                         }
                         PlantType::GatlingCherry => {
-                            // Dispara tiros explosivos poderosos
                             if zombie_in_lane && plant.attack_timer >= 1.3 {
-                                projectiles.push(Projectile {
-                                    row: r,
-                                    x: plant_x + 25.0,
-                                    damage: 65.0,
-                                    explosive: true,
-                                });
+                                projectiles.push(Projectile { row: r, x: plant_x + 25.0, damage: 65.0, explosive: true });
                                 plant.attack_timer = 0.0;
                             }
                         }
@@ -334,12 +303,10 @@ async fn main() {
             }
         }
 
-        // Atualização dos Projéteis
         for proj in &mut projectiles {
             proj.x += 280.0 * dt;
         }
 
-        // Colisão Projétil x Zumbi
         projectiles.retain(|proj| {
             let mut hit = false;
             for z in &mut zombies {
@@ -356,7 +323,6 @@ async fn main() {
             !hit && proj.x < 860.0
         });
 
-        // Atualização dos Zumbis e Mordidas
         for z in &mut zombies {
             let col = ((z.x - GRID_OFFSET_X) / CELL_SIZE) as isize;
             let mut eating = false;
@@ -371,7 +337,6 @@ async fn main() {
                         let dead_kind = plant.kind;
                         grid[z.row][c] = None;
 
-                        // Efeito especial: Noz-Bomba explode ao morrer!
                         if dead_kind == PlantType::ExplodeNut {
                             let ex_x = GRID_OFFSET_X + c as f32 * CELL_SIZE + CELL_SIZE / 2.0;
                             let ex_y = GRID_OFFSET_Y + z.row as f32 * CELL_SIZE + CELL_SIZE / 2.0;
@@ -398,7 +363,6 @@ async fn main() {
             }
         }
 
-        // Remove zumbis mortos e soma pontos
         zombies.retain(|z| {
             if z.hp <= 0.0 {
                 score += if z.is_conehead { 25 } else { 10 };
@@ -408,34 +372,27 @@ async fn main() {
             }
         });
 
-        // Atualiza efeitos visuais de explosão
         for ex in &mut explosions {
             ex.timer -= dt;
         }
         explosions.retain(|ex| ex.timer > 0.0);
 
-        // --- RENDERIZAÇÃO ---
-        // HUD Superior
-        draw_rectangle(0.0, 0.0, 900.0, 85.0, DARKBROWN);
-        draw_text(&format!("SOL: {}", sun), 18.0, 34.0, 30.0, YELLOW);
-        draw_text(&format!("PTS: {} | ONDA {}", score, wave), 18.0, 64.0, 20.0, WHITE);
+        draw_rectangle(0.0, 0.0, 900.0, 92.0, DARKBROWN);
+        draw_text(&format!("SOL: {}", sun), 18.0, 36.0, 30.0, YELLOW);
+        draw_text(&format!("PTS: {} | ONDA {}", score, wave), 18.0, 72.0, 19.0, WHITE);
 
-        draw_text(
-            " Ervilha(100)  Girassol(50)  Noz(50)  Cereja(150)",
-            210.0,
-            32.0,
-            20.0,
-            WHITE,
-        );
-        draw_text(
-            &format!("Semente: {} | {}", selected_seed.label(), status_msg),
-            210.0,
-            64.0,
-            18.0,
-            GOLD,
-        );
+        for (i, &seed) in seed_cards.iter().enumerate() {
+            let card_x = 210.0 + (i as f32 * 145.0);
+            let card_y = 8.0;
+            let is_selected = selected_seed == seed;
+            let bg = if is_selected { GOLD } else { Color::from_rgba(90, 50, 20, 255) };
+            draw_rectangle(card_x, card_y, 135.0, 42.0, bg);
+            let txt_color = if is_selected { BLACK } else { WHITE };
+            draw_text(&format!("{} ({})", seed.label(), seed.cost()), card_x + 8.0, card_y + 27.0, 18.0, txt_color);
+        }
 
-        // Desenhar Grid e Plantas
+        draw_text(&status_msg, 210.0, 74.0, 19.0, GOLD);
+
         for r in 0..ROWS {
             for c in 0..COLS {
                 let x = GRID_OFFSET_X + c as f32 * CELL_SIZE;
@@ -450,42 +407,31 @@ async fn main() {
                 if let Some(plant) = grid[r][c] {
                     draw_circle(x + CELL_SIZE / 2.0, y + CELL_SIZE / 2.0, 25.0, plant.kind.color());
                     draw_text(plant.kind.label(), x + 6.0, y + 73.0, 13.0, WHITE);
-
-                    // Barra de vida da planta
                     let hp_ratio = (plant.hp / plant.kind.max_hp()).clamp(0.0, 1.0);
                     draw_rectangle(x + 10.0, y + 6.0, 60.0 * hp_ratio, 5.0, SKYBLUE);
                 }
             }
         }
 
-        // Desenhar Projéteis
         for proj in &projectiles {
             let y = GRID_OFFSET_Y + proj.row as f32 * CELL_SIZE + CELL_SIZE / 2.0;
             let color = if proj.explosive { RED } else { LIME };
             draw_circle(proj.x, y, if proj.explosive { 10.0 } else { 8.0 }, color);
         }
 
-        // Desenhar Zumbis
         for z in &zombies {
             let y = GRID_OFFSET_Y + z.row as f32 * CELL_SIZE + 16.0;
             let body_color = if z.is_conehead { MAROON } else { PURPLE };
             draw_rectangle(z.x - 15.0, y, 30.0, 48.0, body_color);
 
             if z.is_conehead {
-                // Desenha cone laranja na cabeça do zumbi
-                draw_triangle(
-                    vec2(z.x, y - 14.0),
-                    vec2(z.x - 12.0, y),
-                    vec2(z.x + 12.0, y),
-                    ORANGE,
-                );
+                draw_triangle(vec2(z.x, y - 14.0), vec2(z.x - 12.0, y), vec2(z.x + 12.0, y), ORANGE);
             }
 
             let hp_ratio = (z.hp / z.max_hp).clamp(0.0, 1.0);
             draw_rectangle(z.x - 15.0, y - 20.0, 30.0 * hp_ratio, 4.0, RED);
         }
 
-        // Desenhar Explosões
         for ex in &explosions {
             draw_circle(ex.x, ex.y, 45.0, Color::from_rgba(255, 140, 0, 160));
         }
