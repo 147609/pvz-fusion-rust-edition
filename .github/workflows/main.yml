@@ -1,4 +1,4 @@
-name: Compilar PvZ Fusion Rust
+name: Compilar PvZ Fusion (Windows + Android APK)
 
 on: [push, workflow_dispatch]
 
@@ -14,5 +14,35 @@ jobs:
       - name: Salvar Executavel (.exe)
         uses: actions/upload-artifact@v4
         with:
-          name: PvZ-Fusion-Windows
+          name: PvZ-Fusion-Windows-EXE
           path: target/release/pvz_fusion_rust.exe
+
+  build-android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Instalar Rust e targets Android
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+      - name: Instalar cargo-quad-apk
+        run: cargo install cargo-quad-apk
+      - name: Compilar APK Android
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0" "platforms;android-34" "ndk;26.1.10909125"
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
+          cargo quad-apk build --release
+      - name: Salvar APK Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvZ-Fusion-Android-APK
+          path: target/android-artifacts/release/apk/*.apk
