@@ -1,0 +1,18 @@
+name: Compilar PvZ Fusion Rust
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Compilar para Windows
+        run: cargo build --release
+      - name: Salvar Executavel (.exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvZ-Fusion-Windows
+          path: target/release/pvz_fusion_rust.exe
