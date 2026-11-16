@@ -1,0 +1,8 @@
+[package]
+name = "pvz_fusion_rust"
+version = "0.1.0"
+edition = "2021"
+description = "Protótipo de Plants vs. Zombies Fusion reescrito em Rust usando Macroquad"
+
+[dependencies]
+macroquad = "0.4"
